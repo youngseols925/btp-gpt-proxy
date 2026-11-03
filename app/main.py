@@ -149,8 +149,12 @@ async def proxy_chat(request: Request):
     # BTP AI Core는 model 필드 대신 deployment URL로 라우팅하므로 제거
     ai_body = {k: v for k, v in body.items() if k != "model"}
 
+    # GPT: max_tokens → max_completion_tokens 변환
+    if "max_tokens" in ai_body:
+        ai_body["max_completion_tokens"] = ai_body.pop("max_tokens")
+
     token = await get_access_token()
-    url   = f"{AICORE_BASE_URL}/v2/inference/deployments/{deployment}/chat/completions"
+    url   = f"{AICORE_BASE_URL}/v2/inference/deployments/{deployment}/v1/chat/completions"
 
     headers = {
         "Authorization":     f"Bearer {token}",
