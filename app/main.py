@@ -147,9 +147,13 @@ async def proxy_chat(request: Request):
     logger.info(f"[REQ] model={model} deployment={deployment} stream={stream} max_tokens={max_tokens} keys={list(body.keys())}")
 
     # BTP AI Core는 model 필드 대신 deployment URL로 라우팅하므로 제거
-    # stream 필드도 제거 (스트리밍은 URL 파라미터로 처리)
     STRIP_FIELDS = {"model"}
     ai_body = {k: v for k, v in body.items() if k not in STRIP_FIELDS}
+
+    # GPT reasoning 모델: tools가 있으면 reasoning_effort 제거 (미지원 조합)
+    if "tools" in ai_body and "reasoning_effort" in ai_body:
+        logger.info("[REQ] tools+reasoning_effort 조합 → reasoning_effort 제거")
+        del ai_body["reasoning_effort"]
 
     # GPT: max_tokens → max_completion_tokens 변환
     if "max_tokens" in ai_body:
