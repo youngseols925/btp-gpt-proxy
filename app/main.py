@@ -144,10 +144,12 @@ async def proxy_chat(request: Request):
     stream     = body.get("stream", False)
     max_tokens = body.get("max_tokens", "?")
 
-    logger.info(f"[REQ] model={model} deployment={deployment} stream={stream} max_tokens={max_tokens}")
+    logger.info(f"[REQ] model={model} deployment={deployment} stream={stream} max_tokens={max_tokens} keys={list(body.keys())}")
 
     # BTP AI Core는 model 필드 대신 deployment URL로 라우팅하므로 제거
-    ai_body = {k: v for k, v in body.items() if k != "model"}
+    # stream 필드도 제거 (스트리밍은 URL 파라미터로 처리)
+    STRIP_FIELDS = {"model"}
+    ai_body = {k: v for k, v in body.items() if k not in STRIP_FIELDS}
 
     # GPT: max_tokens → max_completion_tokens 변환
     if "max_tokens" in ai_body:
@@ -188,6 +190,10 @@ async def _stream_chat(url, headers, body, model: str, start: float):
     first_chunk = True
     buffer = ""
     async with _http_client.stream("POST", url, headers=headers, json=body) as resp:
+        if resp.status_code != 200:
+            err_body = await resp.aread()
+            logger.error(f"[STREAM ERR] status={resp.status_code} body={err_body.decode()[:500]} request_body={json.dumps(body)[:500]}")
+            return
         async for chunk in resp.aiter_text():
             if first_chunk:
                 logger.info(f"[STREAM] ttfb={time.time()-start:.2f}s")
