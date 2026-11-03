@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btp-gpt-proxy
+  namespace: default
+  labels:
+    app: btp-gpt-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: btp-gpt-proxy
+  template:
+    metadata:
+      labels:
+        app: btp-gpt-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: youngsohn/btp-gpt-proxy:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TZ
+              value: Asia/Seoul
+          envFrom:
+            - secretRef:
+                name: aicore-credentials
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: btp-gpt-proxy
+  namespace: default
+spec:
+  selector:
+    app: btp-gpt-proxy
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: gateway.kyma-project.io/v2
+kind: APIRule
+metadata:
+  name: btp-gpt-proxy
+  namespace: default
+spec:
+  gateway: kyma-system/kyma-gateway
+  hosts:
+    - btp-gpt-proxy.c-49be535.kyma.ondemand.com
+  service:
+    name: btp-gpt-proxy
+    port: 80
+  rules:
+    - path: /*
+      methods: [GET, POST, OPTIONS]
+      noAuth: true
