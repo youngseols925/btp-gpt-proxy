@@ -150,10 +150,11 @@ async def proxy_chat(request: Request):
     STRIP_FIELDS = {"model"}
     ai_body = {k: v for k, v in body.items() if k not in STRIP_FIELDS}
 
-    # GPT reasoning 모델: tools가 있으면 reasoning_effort 제거 (미지원 조합)
+    # GPT reasoning 모델: tools가 있으면 reasoning_effort를 "none"으로 강제
+    # (삭제하면 모델이 기본 reasoning 모드로 동작하여 여전히 400 발생)
     if "tools" in ai_body and "reasoning_effort" in ai_body:
-        logger.info("[REQ] tools+reasoning_effort 조합 → reasoning_effort 제거")
-        del ai_body["reasoning_effort"]
+        logger.info(f"[REQ] tools+reasoning_effort → reasoning_effort 강제 'none' (was: {ai_body['reasoning_effort']})")
+        ai_body["reasoning_effort"] = "none"
 
     # GPT: max_tokens → max_completion_tokens 변환
     if "max_tokens" in ai_body:
