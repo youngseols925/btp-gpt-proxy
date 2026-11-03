@@ -186,25 +186,45 @@ async def proxy_chat(request: Request):
 
 async def _stream_chat(url, headers, body, model: str, start: float):
     first_chunk = True
+    buffer = ""
     async with _http_client.stream("POST", url, headers=headers, json=body) as resp:
-        async for line in resp.aiter_lines():
+        async for chunk in resp.aiter_text():
             if first_chunk:
                 logger.info(f"[STREAM] ttfb={time.time()-start:.2f}s")
                 first_chunk = False
-            if not line:
-                yield "\n"
-                continue
-            # model 필드를 클라이언트가 요청한 모델명으로 교체
-            if line.startswith("data:") and line != "data: [DONE]":
-                try:
-                    data_str = line[5:].strip()
-                    chunk = json.loads(data_str)
-                    chunk["model"] = model
-                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            buffer += chunk
+            while "\n\n" in buffer:
+                frame, buffer = buffer.split("\n\n", 1)
+                frame = frame.strip()
+                if not frame:
                     continue
-                except Exception:
-                    pass
-            yield f"{line}\n\n"
+                if frame == "data: [DONE]":
+                    yield "data: [DONE]\n\n"
+                    continue
+                if frame.startswith("data:"):
+                    try:
+                        data_str = frame[5:].strip()
+                        parsed = json.loads(data_str)
+                        parsed["model"] = model
+                        yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
+                        continue
+                    except Exception:
+                        pass
+                yield f"{frame}\n\n"
+    # 버퍼 잔여 처리
+    if buffer.strip():
+        frame = buffer.strip()
+        if frame == "data: [DONE]":
+            yield "data: [DONE]\n\n"
+        elif frame.startswith("data:"):
+            try:
+                parsed = json.loads(frame[5:].strip())
+                parsed["model"] = model
+                yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
+            except Exception:
+                yield f"{frame}\n\n"
+        else:
+            yield f"{frame}\n\n"
     logger.info(f"[STREAM] done total={time.time()-start:.2f}s")
 
 
