@@ -15,9 +15,11 @@ spec:
       labels:
         app: btp-gpt-proxy
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: proxy
-          image: youngsohn/btp-gpt-proxy:latest
+          image: ghcr.io/youngseols925/btp-gpt-proxy:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
